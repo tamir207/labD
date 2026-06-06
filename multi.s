@@ -4,6 +4,8 @@ section .data
     newline    db 10, 0
     x_struct   db 5
     x_num      db 0xaa, 1, 2, 0x44, 0x4f
+    y_struct   db 6
+    y_num      db 0xaa, 1, 2, 3, 0x44, 0x4f
 
 section .bss
     buffer     resb 500
@@ -18,15 +20,34 @@ section .text
     extern malloc
     extern sscanf
 
+
+get_maxmin:
+    push ecx
+    push edx
+    xor  ecx, ecx
+    mov  cl, [eax]
+    xor  edx, edx
+    mov  dl, [ebx]
+    cmp  cl, dl
+    jge  .done
+    xchg eax, ebx
+.done:
+    pop  edx
+    pop  ecx
+    ret
+
+
 print_multi:
     push ebp
     mov  ebp, esp
     push ebx
     push esi
+
     mov  esi, [ebp+8]
     xor  ebx, ebx
     mov  bl, [esi]
     add  esi, ebx
+
 .print_loop:
     cmp  ebx, 0
     je   .print_done
@@ -39,6 +60,7 @@ print_multi:
     dec  esi
     dec  ebx
     jmp  .print_loop
+
 .print_done:
     push newline
     call printf
@@ -48,6 +70,7 @@ print_multi:
     mov  esp, ebp
     pop  ebp
     ret
+
 
 getmulti:
     push ebp
@@ -89,6 +112,7 @@ getmulti:
     mov  edi, eax
 
     xor  esi, esi
+
 .sscanf_loop:
     cmp  esi, ebx
     jge  .getmulti_done
@@ -119,8 +143,9 @@ getmulti:
     mov  esp, ebp
     pop  ebp
     ret
+
 .error:
-    mov  eax, 0
+    xor  eax, eax
     pop  edi
     pop  esi
     pop  ebx
@@ -128,15 +153,111 @@ getmulti:
     pop  ebp
     ret
 
+
+add_multi:
+    push ebp
+    mov  ebp, esp
+    push ebx
+    push esi
+    push edi
+
+    mov  eax, [ebp+8]
+    mov  ebx, [ebp+12]
+    call get_maxmin
+
+    mov  esi, eax
+
+    xor  ecx, ecx
+    mov  cl, [esi]
+    xor  edx, edx
+    mov  dl, [ebx]
+
+    mov  eax, ecx
+    inc  eax
+    cmp  eax, 255
+    jle  .size_ok
+    mov  eax, 255
+
+.size_ok:
+    push ecx
+    push edx
+    push eax
+    inc  eax
+    push eax
+    call malloc
+    add  esp, 4
+
+    mov  edi, eax
+    pop  eax
+    mov  [edi], al
+    pop  edx
+    pop  ecx
+
+    push edi
+
+    lea  esi, [esi+1]
+    lea  ebx, [ebx+1]
+    lea  edi, [edi+1]
+
+    push ecx
+    mov  eax, ecx
+    sub  eax, edx
+    push eax
+    mov  ecx, edx
+    clc
+
+.add_loop:
+    mov  al, [esi]
+    adc  al, [ebx]
+    mov  [edi], al
+    inc  esi
+    inc  ebx
+    inc  edi
+    dec  ecx
+    jnz  .add_loop
+
+    pop  ecx
+    jecxz .carry_byte
+
+.carry_loop:
+    mov  al, [esi]
+    adc  al, 0
+    mov  [edi], al
+    inc  esi
+    inc  edi
+    dec  ecx
+    jnz  .carry_loop
+
+.carry_byte:
+    mov  al, 0
+    adc  al, 0
+    pop  edx
+    cmp  edx, 255
+    je   .no_extra
+    mov  [edi], al
+
+.no_extra:
+    pop  eax
+    pop  edi
+    pop  esi
+    pop  ebx
+    mov  esp, ebp
+    pop  ebp
+    ret
+
+
 main:
     push ebp
     mov  ebp, esp
+
     push dword [ebp+8]
     push fmt_int
     call printf
     add  esp, 8
+
     mov  ecx, [ebp+8]
     mov  esi, [ebp+12]
+
 .loop:
     cmp  ecx, 0
     je   .done
@@ -148,18 +269,26 @@ main:
     add  esi, 4
     dec  ecx
     jmp  .loop
+
 .done:
     push x_struct
     call print_multi
     add  esp, 4
-    call getmulti
-    cmp  eax, 0
-    je   .skip_print
+
+    push y_struct
+    call print_multi
+    add  esp, 4
+
+    push y_struct
+    push x_struct
+    call add_multi
+    add  esp, 8
+
     push eax
     call print_multi
     add  esp, 4
-.skip_print:
-    mov  eax, 0
+
+    xor  eax, eax
     mov  esp, ebp
     pop  ebp
     ret
