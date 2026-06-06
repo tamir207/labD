@@ -1,14 +1,22 @@
 section .data
-    fmt_int  db "%d", 10, 0
-    fmt_hex  db "%02hhx", 0
-    newline  db 10, 0
-    x_struct db 5
-    x_num    db 0xaa, 1, 2, 0x44, 0x4f
+    fmt_int    db "%d", 10, 0
+    fmt_hex    db "%02hhx", 0
+    newline    db 10, 0
+    x_struct   db 5
+    x_num      db 0xaa, 1, 2, 0x44, 0x4f
+
+section .bss
+    buffer     resb 500
 
 section .text
     global main
     extern printf
     extern puts
+    extern fgets
+    extern stdin
+    extern strlen
+    extern malloc
+    extern sscanf
 
 print_multi:
     push ebp
@@ -41,6 +49,85 @@ print_multi:
     pop  ebp
     ret
 
+getmulti:
+    push ebp
+    mov  ebp, esp
+    push ebx
+    push esi
+    push edi
+
+    push dword [stdin]
+    push 500
+    push buffer
+    call fgets
+    add  esp, 12
+
+    push buffer
+    call strlen
+    add  esp, 4
+    cmp  eax, 0
+    je   .error
+
+    dec  eax
+    mov  byte [buffer + eax], 0
+    mov  ecx, eax
+
+    test ecx, 1
+    jnz  .error
+
+    shr  ecx, 1
+    mov  ebx, ecx
+
+    lea  eax, [ecx + 1]
+    push eax
+    call malloc
+    add  esp, 4
+    cmp  eax, 0
+    je   .error
+
+    mov  [eax], bl
+    mov  edi, eax
+
+    xor  esi, esi
+.sscanf_loop:
+    cmp  esi, ebx
+    jge  .getmulti_done
+
+    mov  eax, ebx
+    sub  eax, esi
+    lea  eax, [edi + eax]
+    push eax
+
+    push fmt_hex
+
+    mov  eax, esi
+    add  eax, eax
+    lea  eax, [buffer + eax]
+    push eax
+
+    call sscanf
+    add  esp, 12
+
+    inc  esi
+    jmp  .sscanf_loop
+
+.getmulti_done:
+    mov  eax, edi
+    pop  edi
+    pop  esi
+    pop  ebx
+    mov  esp, ebp
+    pop  ebp
+    ret
+.error:
+    mov  eax, 0
+    pop  edi
+    pop  esi
+    pop  ebx
+    mov  esp, ebp
+    pop  ebp
+    ret
+
 main:
     push ebp
     mov  ebp, esp
@@ -65,6 +152,13 @@ main:
     push x_struct
     call print_multi
     add  esp, 4
+    call getmulti
+    cmp  eax, 0
+    je   .skip_print
+    push eax
+    call print_multi
+    add  esp, 4
+.skip_print:
     mov  eax, 0
     mov  esp, ebp
     pop  ebp
