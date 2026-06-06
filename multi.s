@@ -8,9 +8,11 @@ section .data
     y_num      db 0xaa, 1, 2, 3, 0x44, 0x4f
     STATE      dw 0x1234
     MASK       dw 0x002D
+    flag_I     db "-I", 0
+    flag_R     db "-R", 0
 
 section .bss
-    buffer     resb 500
+    buffer     resb 501
 
 section .text
     global main
@@ -21,6 +23,7 @@ section .text
     extern strlen
     extern malloc
     extern sscanf
+    extern strcmp
 
 
 get_maxmin:
@@ -52,7 +55,7 @@ print_multi:
 
 .print_loop:
     cmp  ebx, 0
-    je   .print_done
+    jz   .print_done
     xor  eax, eax
     mov  al, [esi]
     push eax
@@ -82,7 +85,7 @@ getmulti:
     push edi
 
     push dword [stdin]
-    push 500
+    push 501
     push buffer
     call fgets
     add  esp, 12
@@ -91,15 +94,27 @@ getmulti:
     call strlen
     add  esp, 4
     cmp  eax, 0
-    je   .error
+    jz   .error
 
     dec  eax
     mov  byte [buffer + eax], 0
     mov  ecx, eax
+    cmp  ecx, 0
+    jz   .error
 
     test ecx, 1
-    jnz  .error
+    jz   .even_digits
 
+    mov  eax, ecx
+.shift_loop:
+    mov  dl, [buffer + eax - 1]
+    mov  [buffer + eax], dl
+    dec  eax
+    jnz  .shift_loop
+    mov  byte [buffer], '0'
+    inc  ecx
+
+.even_digits:
     shr  ecx, 1
     mov  ebx, ecx
 
@@ -108,7 +123,7 @@ getmulti:
     call malloc
     add  esp, 4
     cmp  eax, 0
-    je   .error
+    jz   .error
 
     mov  [eax], bl
     mov  edi, eax
@@ -235,7 +250,7 @@ add_multi:
     adc  al, 0
     pop  edx
     cmp  edx, 255
-    je   .no_extra
+    jz   .no_extra
     mov  [edi], al
 
 .no_extra:
@@ -279,7 +294,7 @@ PRmulti:
 .get_len:
     call rand_num
     cmp  al, 0
-    je   .get_len
+    jz   .get_len
     xor  ebx, ebx
     mov  bl, al
 
@@ -288,7 +303,7 @@ PRmulti:
     call malloc
     add  esp, 4
     cmp  eax, 0
-    je   .pr_error
+    jz   .pr_error
 
     mov  esi, eax
     mov  [esi], bl
@@ -321,31 +336,10 @@ PRmulti:
     ret
 
 
-main:
+do_default:
     push ebp
     mov  ebp, esp
 
-    push dword [ebp+8]
-    push fmt_int
-    call printf
-    add  esp, 8
-
-    mov  ecx, [ebp+8]
-    mov  esi, [ebp+12]
-
-.loop:
-    cmp  ecx, 0
-    je   .done
-    push ecx
-    push dword [esi]
-    call puts
-    add  esp, 4
-    pop  ecx
-    add  esi, 4
-    dec  ecx
-    jmp  .loop
-
-.done:
     push x_struct
     call print_multi
     add  esp, 4
@@ -363,12 +357,131 @@ main:
     call print_multi
     add  esp, 4
 
-    call PRmulti
+    mov  esp, ebp
+    pop  ebp
+    ret
+
+
+do_stdin:
+    push ebp
+    mov  ebp, esp
+    push ebx
+    push esi
+
+    call getmulti
+    cmp  eax, 0
+    jz   .done
+    mov  ebx, eax
+
+    call getmulti
+    cmp  eax, 0
+    jz   .done
+    mov  esi, eax
+
+    push ebx
+    call print_multi
+    add  esp, 4
+
+    push esi
+    call print_multi
+    add  esp, 4
+
+    push esi
+    push ebx
+    call add_multi
+    add  esp, 8
+
     push eax
     call print_multi
     add  esp, 4
 
+.done:
+    pop  esi
+    pop  ebx
+    mov  esp, ebp
+    pop  ebp
+    ret
+
+
+do_random:
+    push ebp
+    mov  ebp, esp
+    push ebx
+    push esi
+
+    call PRmulti
+    cmp  eax, 0
+    jz   .done
+    mov  ebx, eax
+
+    call PRmulti
+    cmp  eax, 0
+    jz   .done
+    mov  esi, eax
+
+    push ebx
+    call print_multi
+    add  esp, 4
+
+    push esi
+    call print_multi
+    add  esp, 4
+
+    push esi
+    push ebx
+    call add_multi
+    add  esp, 8
+
+    push eax
+    call print_multi
+    add  esp, 4
+
+.done:
+    pop  esi
+    pop  ebx
+    mov  esp, ebp
+    pop  ebp
+    ret
+
+
+main:
+    push ebp
+    mov  ebp, esp
+    push ebx
+    push esi
+
+    mov  ebx, [ebp+8]
+    mov  esi, [ebp+12]
+
+    cmp  ebx, 2
+    jl   .default
+
+    mov  eax, [esi+4]
+    push flag_I
+    push eax
+    call strcmp
+    add  esp, 8
+    jnz  .not_stdin
+    call do_stdin
+    jmp  .exit
+
+.not_stdin:
+    mov  eax, [esi+4]
+    push flag_R
+    push eax
+    call strcmp
+    add  esp, 8
+    jnz  .default
+    call do_random
+    jmp  .exit
+
+.default:
+    call do_default
+
+.exit:
     xor  eax, eax
+    pop  esi
+    pop  ebx
     mov  esp, ebp
     pop  ebp
     ret
