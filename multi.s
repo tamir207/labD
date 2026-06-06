@@ -34,7 +34,7 @@ get_maxmin:
     xor  edx, edx
     mov  dl, [ebx]
     cmp  cl, dl
-    jge  .done
+    jae  .done
     xchg eax, ebx
 .done:
     pop  edx
@@ -461,6 +461,7 @@ main:
     push eax
     call strcmp
     add  esp, 8
+    test eax, eax
     jnz  .not_stdin
     call do_stdin
     jmp  .exit
@@ -471,6 +472,7 @@ main:
     push eax
     call strcmp
     add  esp, 8
+    test eax, eax
     jnz  .default
     call do_random
     jmp  .exit
