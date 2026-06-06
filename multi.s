@@ -6,6 +6,8 @@ section .data
     x_num      db 0xaa, 1, 2, 0x44, 0x4f
     y_struct   db 6
     y_num      db 0xaa, 1, 2, 3, 0x44, 0x4f
+    STATE      dw 0x1234
+    MASK       dw 0x002D
 
 section .bss
     buffer     resb 500
@@ -246,6 +248,79 @@ add_multi:
     ret
 
 
+rand_num:
+    push ebx
+
+    mov  ax, [STATE]
+    mov  bx, ax
+    and  bx, [MASK]
+
+    mov  bx, 0
+    jp   .even
+    mov  bx, 0x8000
+.even:
+    shr  ax, 1
+    or   ax, bx
+    mov  [STATE], ax
+
+    xor  eax, eax
+    mov  al, [STATE]
+
+    pop  ebx
+    ret
+
+
+PRmulti:
+    push ebp
+    mov  ebp, esp
+    push ebx
+    push esi
+
+.get_len:
+    call rand_num
+    cmp  al, 0
+    je   .get_len
+    xor  ebx, ebx
+    mov  bl, al
+
+    lea  eax, [ebx + 1]
+    push eax
+    call malloc
+    add  esp, 4
+    cmp  eax, 0
+    je   .pr_error
+
+    mov  esi, eax
+    mov  [esi], bl
+
+    xor  ecx, ecx
+.fill_loop:
+    cmp  ecx, ebx
+    jge  .pr_done
+    push ecx
+    call rand_num
+    pop  ecx
+    mov  [esi + ecx + 1], al
+    inc  ecx
+    jmp  .fill_loop
+
+.pr_done:
+    mov  eax, esi
+    pop  esi
+    pop  ebx
+    mov  esp, ebp
+    pop  ebp
+    ret
+
+.pr_error:
+    xor  eax, eax
+    pop  esi
+    pop  ebx
+    mov  esp, ebp
+    pop  ebp
+    ret
+
+
 main:
     push ebp
     mov  ebp, esp
@@ -284,6 +359,11 @@ main:
     call add_multi
     add  esp, 8
 
+    push eax
+    call print_multi
+    add  esp, 4
+
+    call PRmulti
     push eax
     call print_multi
     add  esp, 4
