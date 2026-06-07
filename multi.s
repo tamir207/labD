@@ -103,7 +103,7 @@ getmulti:
     jz   .error
 
     test ecx, 1
-    jz   .even_digits
+    jz   .even_chars
 
     mov  eax, ecx
 .shift_loop:
@@ -114,7 +114,7 @@ getmulti:
     mov  byte [buffer], '0'
     inc  ecx
 
-.even_digits:
+.even_chars:
     shr  ecx, 1
     mov  ebx, ecx
 
@@ -192,10 +192,10 @@ add_multi:
     mov  eax, ecx
     inc  eax
     cmp  eax, 255
-    jle  .size_ok
+    jle  .good_size
     mov  eax, 255
 
-.size_ok:
+.good_size:
     push ecx
     push edx
     push eax
@@ -234,7 +234,7 @@ add_multi:
     jnz  .add_loop
 
     pop  ecx
-    jecxz .carry_byte
+    jecxz .last_carry
 
 .carry_loop:
     mov  al, [esi]
@@ -245,15 +245,15 @@ add_multi:
     dec  ecx
     jnz  .carry_loop
 
-.carry_byte:
+.last_carry:
     mov  al, 0
     adc  al, 0
     pop  edx
     cmp  edx, 255
-    jz   .no_extra
+    jz   .skip_last_carry
     mov  [edi], al
 
-.no_extra:
+.skip_last_carry:
     pop  eax
     pop  edi
     pop  esi
@@ -291,10 +291,10 @@ PRmulti:
     push ebx
     push esi
 
-.get_len:
+.get_length:
     call rand_num
     cmp  al, 0
-    jz   .get_len
+    jz   .get_length
     xor  ebx, ebx
     mov  bl, al
 
@@ -303,23 +303,23 @@ PRmulti:
     call malloc
     add  esp, 4
     cmp  eax, 0
-    jz   .pr_error
+    jz   .prmulti_error
 
     mov  esi, eax
     mov  [esi], bl
 
     xor  ecx, ecx
-.fill_loop:
+.gen_byte:
     cmp  ecx, ebx
-    jge  .pr_done
+    jge  .prmulti_done
     push ecx
     call rand_num
     pop  ecx
     mov  [esi + ecx + 1], al
     inc  ecx
-    jmp  .fill_loop
+    jmp  .gen_byte
 
-.pr_done:
+.prmulti_done:
     mov  eax, esi
     pop  esi
     pop  ebx
@@ -327,7 +327,7 @@ PRmulti:
     pop  ebp
     ret
 
-.pr_error:
+.prmulti_error:
     xor  eax, eax
     pop  esi
     pop  ebx
@@ -336,7 +336,7 @@ PRmulti:
     ret
 
 
-do_default:
+default_mode:
     push ebp
     mov  ebp, esp
 
@@ -362,7 +362,7 @@ do_default:
     ret
 
 
-do_stdin:
+stdin_mode:
     push ebp
     mov  ebp, esp
     push ebx
@@ -403,7 +403,7 @@ do_stdin:
     ret
 
 
-do_random:
+random_mode:
     push ebp
     mov  ebp, esp
     push ebx
@@ -463,7 +463,7 @@ main:
     add  esp, 8
     test eax, eax
     jnz  .not_stdin
-    call do_stdin
+    call stdin_mode
     jmp  .exit
 
 .not_stdin:
@@ -474,11 +474,11 @@ main:
     add  esp, 8
     test eax, eax
     jnz  .default
-    call do_random
+    call random_mode
     jmp  .exit
 
 .default:
-    call do_default
+    call default_mode
 
 .exit:
     xor  eax, eax
